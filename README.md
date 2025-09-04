@@ -4,7 +4,7 @@
 **Authors:** Alchemical AI  
 **Date:** 2025‑09‑03
 
-This revision integrates the verified Retell AI API and SDK usage, clarifies chat↔voice interactions, confirms conformance with Helpware's specifications, and formalizes the backend endpoints so the Helpware frontend can adopt the smallest possible change surface.
+The front end design is outlined by Helpware's own design team. The features and functionality are outlined below. Alchemical AI is designing the backend and integrating with Retell AI's chat and voice AI bot as well as Helpware's Hubspot and Cal.com accounts for lead generation and sales scheduling. This design document integrates the verified Retell AI API and SDK usage, clarifies chat↔voice interactions, confirms conformance with Helpware's specifications, and formalizes the backend endpoints so the Helpware frontend can adopt the smallest possible change surface.
 
 ---
 
@@ -21,11 +21,51 @@ This revision integrates the verified Retell AI API and SDK usage, clarifies cha
 
 ## 2) Conformance to Helpware Design Spec
 
-- **Floating chat button (bottom right) + CTA on scroll** — Confirmed. The helpware design doc shows a floating button in the **bottom‑right** and the CTA text extending on scroll (Page 1). We'll expose a minimal hook so the FE shows/hides the CTA label on scroll.
-- **Chat overlay contents** — Logo, close, animated sphere, intro, quick actions, text input, and **Voice** button (Page 2). Spec matches and fixes quick‑action labels.
-- **Quick actions** — Finalized set per the doc: **Schedule a video meeting**, **Talk to sales now**, **Call me back** (Page 2). We've removed earlier ambiguity from our internal drafts.
-- **Voice mode behavior** — On clicking Voice, the overlay remains with the animated sphere; browser mic permission is required; **previous chat history must be added to voice context**; user can **Stop** the voice session; **the text of the voice conversation is displayed back in the chat** after it's completed (Page 3). All items are implemented below via Retell's Web SDK, dynamic variables, and a small transcript‑return flow.
+### Front End Features (abridged)
 
+    1. **Chat overlay window** is displayed when the button is clicked including:
+       1. Logo
+       2. Close button
+       3. Animated image (sphere)
+       4. Intro message
+       5. Quick action buttons:
+          1. Schedule a video meeting
+          2. Talk to sales now
+          3. Call me back
+       6. Text input field
+       7. Voice chat button
+    
+    2. **When a user types**, the conversation is displayed as a text chat
+    
+    3. **When a user clicks voice chat button**, the chat window is overlaid by the animated image and voice agent holds the conversation:
+       1. User should allow access to the microphone in their web browser to start a voice conversation
+       2. The previous history of this chat should be added to the context of the voice chat
+       3. User can finish a voice conversation clicking Stop button
+       4. The text of the conversation is displayed in the chat window after the conversation has been completed
+
+### Questions, Clarifications, and Assumptions
+
+  1. **Retell Integration Complexity**: Retell's production grade, out-of-the-box chat widgets don't support all of the functionality requested so we have put together a spec that tries to balance increased complexity with development effort. As such we would kindly request to view the front-end code base (or relevant snippets) to more easily integrate with our back-end code development. The spec includes a webhook handler to support post-call data analysis and integrations such as adding a user to your Hubspot CRM, pulling usage data for billing, etc.
+  
+  2. **Quick Action Button Clarification**: The front-end features outlined above include 3 quick action buttons: "Schedule a video meeting", "Talk to sales now", and "Call me back". However, the screen shot shows quick action buttons as "Fill in Form", "Schedule a call", and "Switch to Voice Agent". We would like clarification on which buttons are included and what functionality they require.
+  
+  3. **Sales Contact Workflow**: If "Talk to Sales Now" and "Call me back" are included, we need to understand what the difference between these are. Both would require gathering the user's contact info and making an outbound call. We are able to make outbound calls from Retell AI which connects a user to an AI voice agent over the phone. We aren't sure what is required for talking to a sales team member - do you want us to make a call and then transfer it to a live team number?
+  
+  4. **Chat-to-Voice Transition**: Retell does not natively support chat-to-voice transition within their API. It may be possible to build this by closing the text-based chat conversation upon the transition, summarizing the conversation and placing this summary into a dynamic variable that is ingested by the voice AI bot. We haven't tested this before so we aren't sure of how well the Voice agent can integrate prior conversations smoothly into its workflow. We will need to test this thoroughly. We may need to build a duplicate AI Voice bot specifically for handling chat-to-voice transitions.
+
+### Key Constraints
+
+1. **Access Token Limitations**: Web calls require a short-lived access token created by the backend, then passed to the browser and then consumed by `RetellWebClient.startCall({ accessToken })`. Token must be used within 30 seconds or it's invalid.
+
+2. **Call Transfer Restrictions**: Call Transfer (cold/warm) is supported only for phone calls, not web calls. This means "Talk to sales now" should initiate an outbound phone call to the user and then warm transfer as needed; you can't warm-transfer from a pure browser web-call.
+
+3. **API Separation**: Chat API is separate from Call API; to continue context from Chat → Voice, fetch chat history and pass summary/variables into the call via `retell_llm_dynamic_variables` (as discussed above).
+
+### FE Spec Summary
+- **Floating chat button (bottom right) + CTA on scroll** — The helpware design doc shows a floating button in the **bottom‑right** and the CTA text extending on scroll (Page 1). We'll expose a minimal hook so the FE shows/hides the CTA label on scroll.
+- **Chat overlay contents** — Logo, close, animated sphere, intro, quick actions, text input, and **Voice** button (Page 2).
+- **Quick actions** — Confirm set of quick actions: **Schedule a video meeting**, **Talk to sales now**, **Call me back** (Page 2). The draft spec includes these but can be changed.
+- **Voice mode behavior** — On clicking Voice, the overlay remains with the animated sphere; browser mic permission is required; **previous chat history must be added to voice context**; user can **Stop** the voice session; **the text of the voice conversation is displayed back in the chat** after it's completed (Page 3). All items are implemented below via Retell's Web SDK, dynamic variables, and a small transcript‑return flow.
 ---
 
 ## 3) Architecture Overview
@@ -46,22 +86,9 @@ This revision integrates the verified Retell AI API and SDK usage, clarifies cha
 
 ---
 
-## 4) Frontend UX (Final)
+## 4) Backend REST Endpoints
 
-1) **Floating button** (bottom‑right). FE extends CTA text on scroll.
-2) **Chat overlay** includes logo, close, animated sphere, intro, quick actions, input, **Voice** button. 
-3) **Typing** shows chat thread; agent replies stream in.  
-4) **Voice** replaces the panel with the animated sphere; on Stop, we return to chat and show the transcript.
-
-> **Key UX Flow**: After the voice session ends, we display the **transcript** in the chat pane (best‑effort reconstruction from events + post‑call fetch).
-
----
-
-## 5) Backend REST Endpoints
-
-> **Why one change here?** To meet the requirement "show the voice conversation text in chat afterward," the **web‑token** endpoint now returns **both** `access_token` **and** `call_id`; and we add a small **GET** to retrieve final details (transcript/analysis) after call end.
-
-### 5.1 Chat
+### 4.1 Chat
 
 **Create chat**  
 `POST /api/chat`  
@@ -98,7 +125,7 @@ Returns the Retell chat object (status, transcript, message history excerpt, ana
 - `client.chat.retrieve(chat_id)`
 - `client.chat.end(chat_id)`
 
-### 5.2 Voice (Web Call)
+### 4.2 Voice (Web Call)
 
 **Get web‑call access token** (short‑lived; must start within ~30s)  
 `POST /api/calls/web-token`  
@@ -115,7 +142,7 @@ Server behavior:
 - Build `retell_llm_dynamic_variables` including `chat_summary` (computed server‑side from stored chat messages or `/api/chat/{chat_id}`) and any lead/contact state.
 - Call `client.call.createWebCall({ agent_id, retell_llm_dynamic_variables })` and return both `access_token` and `call_id`.
 
-Response (updated):
+Response:
 ```json
 { "access_token": "JWT", "call_id": "retell_call_id", "expires_in_seconds": 30 }
 ```
@@ -124,7 +151,7 @@ Response (updated):
 `GET /api/calls/{call_id}`  
 Returns final call info (transcript, analysis) once available, allowing the FE to inject the **voice conversation text back into the chat thread** exactly as helpware specifies.
 
-### 5.3 Voice (Phone Call)
+### 4.3 Voice (Phone Call)
 
 **Start outbound phone call (AI first)**  
 `POST /api/calls/phone`  
@@ -153,7 +180,7 @@ Returns:
 - Warm/cold transfer is only supported in **phone** calls.
 - Only **phone** calls can warm/cold transfer; this powers **Talk to sales now** when we want a human handoff.
 
-### 5.4 Quick Actions
+### 4.4 Quick Actions
 
 We'll keep **separate endpoints** for the three Quick Actions (lowest frontend change and clearer auth/policy), implemented internally by one controller if desired.
 
@@ -198,9 +225,9 @@ Each accepts `contact` details and optional `chat_id` for context, then uses Hub
 
 ---
 
-## 6) Frontend Integration
+## 5) Frontend Integration
 
-### 6.1 Chat (text)
+### 5.1 Chat (text)
 
 Minimal changes: the FE does **not** speak directly to Retell; it calls our backend.
 
@@ -220,7 +247,7 @@ const { messages } = await fetch(`/api/chat/${chat_id}/messages`, {
 }).then(r => r.json());
 ```
 
-### 6.2 Voice (Web SDK - Enhanced with Transcript Retrieval)
+### 5.2 Voice (Web SDK - Enhanced with Transcript Retrieval)
 
 Use the **Web SDK** in the browser.
 
@@ -258,7 +285,7 @@ retellWebClient.on('error', (e) => { console.error(e); retellWebClient.stopCall(
 
 > **Token lifetime:** access token expires quickly (~30s). Only request it **right before** `startCall`.
 
-### 6.3 Voice (phone call)
+### 5.3 Voice (phone call)
 
 The FE calls our backend; no browser SDK involved:
 ```ts
@@ -276,7 +303,7 @@ await fetch('/api/calls/phone', {
 
 ---
 
-## 7) Chat → Voice Context Handoff
+## 6) Chat → Voice Context Handoff
 
 1) **Summarize** the active chat (server‑side) and gather any structured fields (contact, interest, last QA).  
 2) Include this as `retell_llm_dynamic_variables` when creating the web/phone call:  
@@ -296,16 +323,16 @@ Behavior: We summarize chat server‑side and pass it via `retell_llm_dynamic_va
 
 ---
 
-## 8) Transfers (Human Handoff)
+## 7) Transfers (Human Handoff)
 
 - **Supported only in phone calls.** Configure a **Transfer Call** tool/node inside the agent with the destination(s) and handoff prompt/whisper.  
 - For "Talk to sales now", we place the outbound call to the user first, then the agent warm‑transfers to the live queue when appropriate.
 
 ---
 
-## 9) Webhooks & Analytics (Server)
+## 8) Webhooks & Analytics (Server)
 
-### 9.1 Unified Webhook Endpoint
+### 8.1 Unified Webhook Endpoint
 
 **Important:** Each Retell agent can only have **one webhook URL** configured. Therefore, our server must implement a **single endpoint** that handles **multiple event types**.
 
@@ -319,7 +346,7 @@ Behavior: We summarize chat server‑side and pass it via `retell_llm_dynamic_va
 - `chat_ended` - Chat session completion
 - `chat_analyzed` - Post-chat analysis available
 
-### 9.2 Implementation Pattern
+### 8.2 Implementation Pattern
 
 ```ts
 // Unified webhook handler
@@ -364,7 +391,7 @@ app.post('/api/webhooks/retell', async (req, res) => {
 });
 ```
 
-### 9.3 Event Processing Logic
+### 8.3 Event Processing Logic
 
 **On `call_analyzed` or `chat_analyzed`:**
 - Upsert transcript & analysis to storage
@@ -386,7 +413,7 @@ app.post('/api/webhooks/retell', async (req, res) => {
 
 ---
 
-## 10) Security & Reliability
+## 9) Security & Reliability
 
 - All backend calls to Retell use the **server SDK** and API key in secure env.  
 - Enforce **rate limiting**, **input validation**, **CORS** for Helpware origin(s), **HTTPS** only.  
@@ -397,7 +424,7 @@ app.post('/api/webhooks/retell', async (req, res) => {
 
 ---
 
-## 11) Open Items (Helpware Confirmation)
+## 10) Open Items (Helpware Confirmation)
 
 - Confirm final **Quick Action** button labels and which flows to enable at launch.  
 - **Confirm Cal.com integration approach**: Use Retell's native Cal.com integration for AI-driven scheduling, or implement separate Cal.com API integration via our backend endpoints.
@@ -405,11 +432,11 @@ app.post('/api/webhooks/retell', async (req, res) => {
 ---
 
 
-## 12) Appendix — **Reference Snippets** (TypeScript/Express + Browser)
+## 11) Appendix — **Reference Snippets** (TypeScript/Express + Browser)
 
 > These snippets are **notional** and compile in a typical Node/Express + TS setup. They demonstrate route shapes, request validation, Retell SDK calls, chat→voice handoff, and FE integration. Replace stubs with real implementations for HubSpot/Cal.com, persistence, auth, and webhook signature checks.
 
-### 12.1 Server Setup (Express, CORS, Rate Limit, Types)
+### 11.1 Server Setup (Express, CORS, Rate Limit, Types)
 
 ```ts
 // src/server.ts
@@ -475,7 +502,7 @@ async function buildDynamicVars(input: {
 }
 ```
 
-### 12.2 Chat Routes
+### 11.2 Chat Routes
 
 ```ts
 // src/routes/chat.ts
@@ -535,7 +562,7 @@ export function chatRouter(retell: Retell) {
 }
 ```
 
-### 12.3 Calls: Web Token, Retrieve Call, Phone Dial
+### 11.3 Calls: Web Token, Retrieve Call, Phone Dial
 
 ```ts
 // src/routes/calls.ts
@@ -610,7 +637,7 @@ export function callsRouter(retell: Retell) {
 }
 ```
 
-### 12.4 Quick Actions
+### 11.4 Quick Actions
 
 ```ts
 // src/routes/actions.ts
@@ -709,7 +736,7 @@ export function actionsRouter(retell: Retell) {
 }
 ```
 
-### 12.5 Webhooks (Retell → Backend)
+### 11.5 Webhooks (Retell → Backend)
 
 ```ts
 // src/routes/webhooks.ts
@@ -730,7 +757,7 @@ export function webhooksRouter() {
 }
 ```
 
-### 12.6 Compose the App
+### 11.6 Compose the App
 
 ```ts
 // src/index.ts
@@ -759,7 +786,7 @@ app.listen(Number(process.env.PORT || 8080), () => {
 });
 ```
 
-### 12.7 Frontend (Browser) — Chat + Voice + Quick Actions + CTA on Scroll
+### 11.7 Frontend (Browser) — Chat + Voice + Quick Actions + CTA on Scroll
 
 ```ts
 // chat-ui.ts (pseudo-implementation)
@@ -863,7 +890,7 @@ function renderRollingTranscript(t: string) { /* … */ }
 function appendSystemMessage(t: string) { /* … */ }
 ```
 
-### 12.8 `.env.example`
+### 11.8 `.env.example`
 
 ```bash
 RETELL_API_KEY=sk_live_xxx
