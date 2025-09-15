@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Text Chat</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    /* Loading overlay that matches ChatDash style */
+    #loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #fff;
+      z-index: 999999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.3s ease;
+    }
+    
+    #loading-overlay.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .loading-content {
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .loading-logo {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    
+    .loading-text {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 16px;
+      color: #0E121B;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    
+    .loading-subtext {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      color: #98A2B3;
+    }
+    
+    .loading-spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid #E6EAF3;
+      border-top-color: #0E121B;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 16px auto 0;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+
+  <script
+    id="retell-widget"
+    src="https://dashboard.retellai.com/retell-widget.js"
+    type="module"
+    data-public-key="key_dd6ca6cd20325ba137fb797e1dc2"
+    data-agent-id="agent_36d15796190bcb840206f004e4"
+    data-title="Helpware Welcome Agent - Alexei"
+    data-logo-url="https://950235f958fd.ngrok.app/assets/helpware_logo.png"
+    data-color="#0E121B"
+    data-auto-open="true"
+    data-show-ai-popup="false"
+  ></script>
+
+  <script>
+    let stylingApplied = false;
+    
+    function applySeamlessStyling() {
+      console.log('🎨 Applying seamless styling...');
+      
+      // Find the shadow root
+      let shadowRoot = null;
+      const elements = Array.from(document.body.children);
+      
+      for (const el of elements) {
+        if (el.shadowRoot) {
+          const chatWindow = el.shadowRoot.querySelector('.retell-chat-window');
+          if (chatWindow) {
+            shadowRoot = el.shadowRoot;
+            console.log('✅ Found shadow root');
+            break;
+          }
+        }
+      }
+      
+      if (!shadowRoot) {
+        console.log('⏳ Widget not ready yet');
+        return false;
+      }
+
+      // Apply all styling at once
+      const css = `
+        /* Hide everything initially */
+        .retell-chat-window {
+          opacity: 0 !important;
+          transition: opacity 0.3s ease !important;
+        }
+        
+        /* Hide FAB and unnecessary elements */
+        .retell-fab { 
+          display: none !important; 
+        }
+        
+        #retell-minimize, #retell-close { 
+          display: none !important; 
+        }
+
+        /* Optimize chat window for iframe */
+        .retell-chat-window {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          max-width: none !important;
+          max-height: none !important;
+          border-radius: 0 !important;
+          border: none !important;
+          box-shadow: none !important;
+          margin: 0 !important;
+        }
+
+        /* Header styling */
+        .retell-header {
+          background: #fff !important;
+          color: #0E121B !important;
+          border-bottom: 1px solid #EEF2F7 !important;
+          display: flex !important;
+          align-items: center !important;
+          padding: 12px 16px !important;
+          height: auto !important;
+          min-height: 60px !important;
+        }
+
+        .retell-header img {
+          width: 32px !important;
+          height: 32px !important;
+          border-radius: 8px !important;
+          margin-right: 12px !important;
+          object-fit: contain !important;
+        }
+
+        #retell-header-title {
+          font-weight: 600 !important;
+          font-size: 16px !important;
+          color: #0E121B !important;
+          line-height: 20px !important;
+          flex-grow: 1 !important;
+        }
+
+        .header-subtitle {
+          font-weight: 400 !important;
+          font-size: 13px !important;
+          color: #98A2B3 !important;
+          margin-top: 2px !important;
+        }
+
+        /* Messages area */
+        .retell-messages {
+          background: #fff !important;
+          padding: 16px !important;
+          height: calc(100% - 140px) !important;
+          overflow-y: auto !important;
+        }
+
+        /* Message bubbles */
+        .retell-msg.agent {
+          background: #EEF2F7 !important;
+          color: #0E121B !important;
+          border-radius: 18px !important;
+          padding: 12px 16px !important;
+          margin-bottom: 12px !important;
+          max-width: 80% !important;
+        }
+        
+        .retell-msg.user {
+          background: #D5E2FF !important;
+          color: #0E121B !important;
+          border-radius: 18px !important;
+          padding: 12px 16px !important;
+          margin-bottom: 12px !important;
+          max-width: 80% !important;
+          margin-left: auto !important;
+        }
+
+        /* Footer */
+        .retell-footer {
+          border-top: 1px solid #EEF2F7 !important;
+          background: #fff !important;
+          padding: 12px 16px !important;
+          position: absolute !important;
+          bottom: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+        }
+
+        /* Hide duplicate powered by text */
+        .retell-powered-by {
+          display: none !important;
+        }
+
+        /* Input styling */
+        .retell-input {
+          background: #F9FAFB !important;
+          border: 1px solid #E6EAF3 !important;
+          border-radius: 12px !important;
+          padding: 10px 14px !important;
+          font-size: 14px !important;
+          color: #0E121B !important;
+        }
+
+        .retell-input:focus {
+          outline: none !important;
+          border-color: #0E121B !important;
+          background: #fff !important;
+        }
+
+        .retell-send-button {
+          background: #0E121B !important;
+          border-radius: 8px !important;
+          padding: 8px 16px !important;
+          color: #fff !important;
+          font-weight: 500 !important;
+          border: none !important;
+          cursor: pointer !important;
+          transition: opacity 0.2s ease !important;
+        }
+
+        .retell-send-button:hover {
+          opacity: 0.9 !important;
+        }
+
+        /* Back button */
+        #retell-back-button {
+          cursor: pointer !important;
+          padding: 6px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          border-radius: 6px !important;
+          transition: background 0.2s ease !important;
+          margin-right: 8px !important;
+        }
+        
+        #retell-back-button:hover {
+          background: rgba(0,0,0,0.05) !important;
+        }
+
+        /* Scrollbar */
+        .retell-messages::-webkit-scrollbar {
+          width: 6px !important;
+        }
+
+        .retell-messages::-webkit-scrollbar-track {
+          background: #F9FAFB !important;
+          border-radius: 3px !important;
+        }
+
+        .retell-messages::-webkit-scrollbar-thumb {
+          background: #D1D5DB !important;
+          border-radius: 3px !important;
+        }
+
+        .retell-messages::-webkit-scrollbar-thumb:hover {
+          background: #9CA3AF !important;
+        }
+        
+        /* Show the widget after styling */
+        .retell-chat-window.styled {
+          opacity: 1 !important;
+        }
+      `;
+      
+      const style = document.createElement('style');
+      style.textContent = css;
+      style.id = 'retell-seamless-styles';
+      shadowRoot.appendChild(style);
+      console.log('✅ Styling injected');
+
+      // Apply DOM modifications
+      setTimeout(() => {
+        // Hide powered by text
+        const poweredBy = shadowRoot.querySelector('.retell-powered-by');
+        if (poweredBy) {
+          poweredBy.style.display = 'none';
+        }
+
+        // Add subtitle
+        const headerTitle = shadowRoot.querySelector('#retell-header-title');
+        if (headerTitle && !headerTitle.querySelector('.header-subtitle')) {
+          const subtitle = document.createElement('div');
+          subtitle.className = 'header-subtitle';
+          subtitle.textContent = 'Our assistant is here to help';
+          headerTitle.appendChild(subtitle);
+        }
+
+        // Configure back button
+        const hamburger = shadowRoot.querySelector('#retell-hamburger');
+        if (hamburger) {
+          hamburger.innerHTML = '<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M11.8 4.8 7.6 9l4.2 4.2-1.2 1.2L5.2 9l5.4-5.4 1.2 1.2Z" fill="#0E121B"/></svg>';
+          hamburger.id = 'retell-back-button';
+          hamburger.title = 'Back';
+          
+          hamburger.addEventListener('click', function() {
+            console.log('🔙 Back button clicked');
+            if (window.parent !== window) {
+              window.parent.postMessage({ 
+                action: 'navigateBack', 
+                source: 'retell-widget',
+                tab: 'previous'
+              }, '*');
+            }
+          });
+        }
+
+        // Fix positioning
+        const chatWindow = shadowRoot.querySelector('.retell-chat-window');
+        if (chatWindow) {
+          chatWindow.style.cssText += 'position: fixed !important; inset: 0 !important;';
+          
+          // Fade in the widget
+          setTimeout(() => {
+            chatWindow.classList.add('styled');
+            console.log('✅ Widget revealed');
+            
+            // Hide loading overlay
+            hideLoadingOverlay();
+          }, 100);
+        }
+      }, 100);
+
+      return true;
+    }
+
+    function hideLoadingOverlay() {
+      const overlay = document.getElementById('loading-overlay');
+      if (overlay) {
+        overlay.classList.add('fade-out');
+        setTimeout(() => {
+          overlay.style.display = 'none';
+        }, 300);
+      }
+    }
+
+    function checkAndApplyStyling() {
+      if (!stylingApplied) {
+        stylingApplied = applySeamlessStyling();
+        return stylingApplied;
+      }
+      return true;
+    }
+
+    // Start checking immediately and frequently
+    let checkCount = 0;
+    const maxChecks = 100; // 10 seconds max
+    
+    const checkInterval = setInterval(() => {
+      checkCount++;
+      
+      if (checkAndApplyStyling()) {
+        clearInterval(checkInterval);
+        console.log('🎉 Seamless styling complete!');
+      } else if (checkCount >= maxChecks) {
+        clearInterval(checkInterval);
+        console.log('⚠️ Styling timeout - showing anyway');
+        hideLoadingOverlay();
+      }
+    }, 100); // Check every 100ms for faster response
+
+    // Listen for messages from ChatDash
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.action) {
+        console.log('📨 Received message:', event.data);
+        
+        switch(event.data.action) {
+          case 'closeWidget':
+            console.log('Closing widget...');
+            break;
+          case 'resetWidget':
+            console.log('Resetting widget...');
+            window.location.reload();
+            break;
+          case 'focusInput':
+            const shadowRoot = document.querySelector('[id*="retell"]')?.shadowRoot;
+            if (shadowRoot) {
+              const input = shadowRoot.querySelector('.retell-input');
+              if (input) input.focus();
+            }
+            break;
+        }
+      }
+    });
+  </script>
+</head>
+<body>
+  <!-- Loading overlay -->
+  <div id="loading-overlay">
+    <div class="loading-content">
+      <img src="https://950235f958fd.ngrok.app/assets/helpware_logo.png" alt="Helpware" class="loading-logo" />
+      <div class="loading-text">Helpware Welcome Agent</div>
+      <div class="loading-subtext">Connecting to Alexei...</div>
+      <div class="loading-spinner"></div>
+    </div>
+  </div>
+  
+  <!-- Widget loads here but stays hidden until styled -->
+</body>
+</html>
