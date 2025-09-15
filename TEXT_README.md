@@ -17,6 +17,8 @@ This solution implements **Option B** from the chatdash.md analysis: using the o
 ├── retell-inline-branded.html  # Original Option B implementation
 ├── server.py                   # Development server with permissive headers
 ├── server-production.py        # 🔒 Production server with security hardening
+├── start-tmux.sh              # 🖥️ tmux session setup script
+├── tmux-manager.sh            # 🎛️ tmux management commands
 ├── TEXT_README.md             # This documentation
 └── chatdash.md                # Original analysis and options
 ```
@@ -201,6 +203,44 @@ python3 server-production.py
 - ✅ **Access logging** - Detailed request logging for monitoring
 - ✅ **Rate limiting protection** - Basic path traversal prevention
 - ✅ **Environment validation** - Ensures proper configuration
+
+### 🖥️ tmux Session Management (Recommended)
+
+Keep your server and ngrok running persistently with tmux:
+
+```bash
+# Set up tmux sessions (preserves existing processes)
+./start-tmux.sh
+
+# Quick management commands
+./tmux-manager.sh status        # Check what's running
+./tmux-manager.sh url           # Get current ngrok URLs
+./tmux-manager.sh attach-server # Attach to server session
+./tmux-manager.sh attach-ngrok  # Attach to ngrok session
+```
+
+**tmux Benefits:**
+- ✅ **Persistent sessions** - Survive terminal disconnections
+- ✅ **Easy monitoring** - Attach/detach from running processes
+- ✅ **Stable ngrok URLs** - No accidental URL changes
+- ✅ **Process isolation** - Server and ngrok in separate sessions
+
+**tmux Commands:**
+```bash
+# List all sessions
+tmux list-sessions
+
+# Attach to a session
+tmux attach-session -t retell-server
+tmux attach-session -t retell-ngrok
+
+# Detach from session (while inside)
+Ctrl+B, then D
+
+# Kill sessions (if needed)
+tmux kill-session -t retell-server
+tmux kill-session -t retell-ngrok
+```
 
 **Restart ngrok if needed:**
 ```bash
