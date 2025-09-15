@@ -13,8 +13,10 @@ This solution implements **Option B** from the chatdash.md analysis: using the o
 
 ```
 /Helpware/
-├── retell-inline-branded.html  # Main chat widget page (Option B implementation)
-├── server.py                   # Local development server with proper headers
+├── retell-seamless.html        # ⭐ RECOMMENDED: Seamless loading chat widget
+├── retell-inline-branded.html  # Original Option B implementation
+├── server.py                   # Development server with permissive headers
+├── server-production.py        # 🔒 Production server with security hardening
 ├── TEXT_README.md             # This documentation
 └── chatdash.md                # Original analysis and options
 ```
@@ -31,7 +33,7 @@ This solution implements **Option B** from the chatdash.md analysis: using the o
 
 ### Step 1: Configure Your Retell Credentials
 
-Edit `retell-inline-branded.html` and replace these placeholders:
+Edit `retell-seamless.html` (recommended) and replace these placeholders:
 
 ```html
 data-public-key="YOUR_RETELL_PUBLIC_KEY"
@@ -64,9 +66,9 @@ Press Ctrl+C to stop the server
 
 ### Step 3: Test Locally
 
-Open your browser to: `http://localhost:8000/retell-inline-branded.html`
+Open your browser to: `http://localhost:8000/retell-seamless.html`
 
-You should see the chat widget load with your custom branding.
+You should see the chat widget load smoothly with your custom branding and no loading flicker.
 
 ### Step 4: Expose with ngrok
 
@@ -83,7 +85,8 @@ t=2025-09-14T23:11:12-0400 lvl=info msg="started tunnel" obj=tunnels name=comman
 ```
 
 **Get your public URLs:**
-- **Chat Widget**: `https://your-ngrok-url.ngrok.app/retell-inline-branded.html`
+- **Chat Widget**: `https://your-ngrok-url.ngrok.app/retell-seamless.html` ⭐ **RECOMMENDED**
+- **Alternative**: `https://your-ngrok-url.ngrok.app/retell-inline-branded.html`
 - **Test Page**: `https://your-ngrok-url.ngrok.app/test-iframe.html`
 
 **Quick command to get the current ngrok URL:**
@@ -136,7 +139,7 @@ Use this iframe code in ChatDash → Add Custom Menu → Iframe to Embed:
 ```html
 <iframe
   id="retell-chat-iframe"
-  src="https://your-ngrok-url.ngrok.app/retell-final-branded.html"
+  src="https://your-ngrok-url.ngrok.app/retell-seamless.html"
   style="width:100%;height:100%;border:none;border-radius:20px;overflow:hidden"
   loading="lazy"
   referrerpolicy="no-referrer-when-downgrade"
@@ -175,8 +178,29 @@ ngrok http 8000 --log=stdout
 
 **Get your current ngrok URL:**
 ```bash
-curl -s http://localhost:4040/api/tunnels | python3 -c "import sys, json; print('Chat Widget URL:', json.load(sys.stdin)['tunnels'][0]['public_url'] + '/retell-inline-branded.html')"
+curl -s http://localhost:4040/api/tunnels | python3 -c "import sys, json; print('Chat Widget URL:', json.load(sys.stdin)['tunnels'][0]['public_url'] + '/retell-seamless.html')"
 ```
+
+### 🔒 Using Production Server (Recommended for Staging/Production)
+
+For better security, use the production server:
+
+```bash
+# Set environment variables
+export ENVIRONMENT=production
+export ALLOWED_ORIGINS=https://your-chatdash-domain.com
+export PORT=8000
+
+# Start production server
+python3 server-production.py
+```
+
+**Production server features:**
+- ✅ **Strict CORS policies** - Only allows specified origins
+- ✅ **Security headers** - XSS protection, content type validation
+- ✅ **Access logging** - Detailed request logging for monitoring
+- ✅ **Rate limiting protection** - Basic path traversal prevention
+- ✅ **Environment validation** - Ensures proper configuration
 
 **Restart ngrok if needed:**
 ```bash
@@ -197,20 +221,191 @@ The included `server.py` provides:
 - **Correct MIME types**: `text/html; charset=utf-8` for HTML files
 - **Auto port detection**: Uses `PORT` environment variable or defaults to 8000
 
-## 🔒 Security Considerations
+## 🔒 Security Considerations & Production Readiness
 
-### For Development (Current Setup)
-- Uses permissive headers for easy testing
-- ngrok provides HTTPS automatically
-- Temporary URLs that expire
+### Current Development Setup ⚠️
+The current setup is optimized for **development and testing** with permissive security settings:
 
-### For Production Deployment
-Update the server headers to be more restrictive:
+- **Permissive CORS**: `Access-Control-Allow-Origin: *`
+- **Open iframe policy**: `X-Frame-Options: ALLOWALL`
+- **Broad CSP**: `frame-ancestors *;`
+- **HTTP + ngrok**: Temporary HTTPS via ngrok tunnel
+- **No authentication**: Direct access to all endpoints
 
-```python
-# Replace * with your actual ChatDash domain
-self.send_header('Content-Security-Policy', 'frame-ancestors https://your-chatdash-domain.com;')
+### 🚨 Critical Security TODOs for Production
+
+#### 1. **HTTPS & SSL Certificates**
+```bash
+# Option A: Use Let's Encrypt (recommended)
+sudo certbot --nginx -d your-domain.com
+
+# Option B: Use Cloudflare for SSL termination
+# Configure Cloudflare proxy with Full SSL mode
 ```
+
+#### 2. **Restrict CORS Origins**
+Update `server.py` for production:
+```python
+# Replace this development setting:
+self.send_header("Access-Control-Allow-Origin", "*")
+
+# With your actual ChatDash domain:
+self.send_header("Access-Control-Allow-Origin", "https://your-chatdash-domain.com")
+```
+
+#### 3. **Harden Content Security Policy**
+```python
+# Development (current):
+self.send_header("Content-Security-Policy", "frame-ancestors *;")
+
+# Production (recommended):
+csp = (
+    "frame-ancestors https://your-chatdash-domain.com; "
+    "default-src 'self' https://dashboard.retellai.com; "
+    "script-src 'self' 'unsafe-inline' https://dashboard.retellai.com; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: https:; "
+    "connect-src 'self' https://dashboard.retellai.com wss://dashboard.retellai.com;"
+)
+self.send_header("Content-Security-Policy", csp)
+```
+
+#### 4. **Add Security Headers**
+```python
+# Add these headers to server.py:
+self.send_header("X-Content-Type-Options", "nosniff")
+self.send_header("X-XSS-Protection", "1; mode=block")
+self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+self.send_header("Permissions-Policy", "microphone=(), camera=(), geolocation=()")
+```
+
+#### 5. **Environment-Based Configuration**
+```python
+import os
+
+# Use environment variables for security settings
+ALLOWED_ORIGINS = os.getenv('ALLOWED_ORIGINS', 'https://your-domain.com').split(',')
+DEVELOPMENT = os.getenv('ENVIRONMENT', 'production') == 'development'
+
+if DEVELOPMENT:
+    # Permissive settings for development
+    self.send_header("Access-Control-Allow-Origin", "*")
+else:
+    # Strict settings for production
+    origin = self.headers.get('Origin')
+    if origin in ALLOWED_ORIGINS:
+        self.send_header("Access-Control-Allow-Origin", origin)
+```
+
+### 🛡️ Production Deployment Checklist
+
+#### Infrastructure Security
+- [ ] **Deploy behind reverse proxy** (nginx/Apache)
+- [ ] **Use proper SSL certificates** (Let's Encrypt/commercial)
+- [ ] **Configure firewall rules** (only allow 80/443)
+- [ ] **Enable fail2ban** or similar intrusion prevention
+- [ ] **Set up monitoring** (uptime, security logs)
+
+#### Application Security
+- [ ] **Update CORS origins** to specific domains
+- [ ] **Implement rate limiting** (nginx limit_req)
+- [ ] **Add request logging** for security auditing
+- [ ] **Validate all inputs** (though minimal in this case)
+- [ ] **Remove debug endpoints** and verbose error messages
+
+#### Retell-Specific Security
+- [ ] **Restrict Retell Public Key domains** to production only
+- [ ] **Use separate Retell keys** for dev/staging/prod
+- [ ] **Monitor Retell API usage** for anomalies
+- [ ] **Implement webhook validation** if using Retell webhooks
+
+#### Monitoring & Maintenance
+- [ ] **Set up SSL certificate renewal** (automated)
+- [ ] **Monitor security headers** (securityheaders.com)
+- [ ] **Regular dependency updates** (Python, ngrok alternatives)
+- [ ] **Log analysis** for suspicious activity
+
+### 🚀 Production Deployment Options
+
+#### Option 1: Traditional VPS/Cloud Server
+```bash
+# 1. Set up server (Ubuntu/CentOS)
+sudo apt update && sudo apt install nginx python3 python3-pip certbot
+
+# 2. Configure nginx reverse proxy
+sudo nano /etc/nginx/sites-available/retell-chat
+
+# 3. Get SSL certificate
+sudo certbot --nginx -d your-domain.com
+
+# 4. Deploy application with systemd service
+sudo systemctl enable retell-chat.service
+```
+
+#### Option 2: Docker Deployment
+```dockerfile
+FROM python:3.9-slim
+WORKDIR /app
+COPY server.py retell-seamless.html ./
+EXPOSE 8000
+CMD ["python3", "server.py"]
+```
+
+#### Option 3: Serverless (AWS Lambda/Vercel)
+- Deploy static HTML to CDN
+- Use serverless functions for dynamic content
+- Automatic HTTPS and scaling
+
+### 🔐 Additional Security Recommendations
+
+#### 1. **API Key Management**
+```bash
+# Use environment variables, never hardcode
+export RETELL_PUBLIC_KEY="key_your_actual_key"
+export RETELL_AGENT_ID="agent_your_actual_id"
+```
+
+#### 2. **Content Validation**
+```python
+# Validate Retell responses if processing them
+import re
+
+def validate_retell_response(data):
+    # Sanitize any user-generated content
+    if 'message' in data:
+        data['message'] = re.sub(r'<script.*?</script>', '', data['message'])
+    return data
+```
+
+#### 3. **Access Logging**
+```python
+import logging
+
+# Set up security logging
+logging.basicConfig(
+    filename='/var/log/retell-chat/security.log',
+    format='%(asctime)s - %(remote_addr)s - %(message)s'
+)
+```
+
+### 🚨 Security Incident Response
+
+If you suspect a security issue:
+
+1. **Immediate Actions**:
+   - Rotate Retell API keys
+   - Check access logs for suspicious activity
+   - Temporarily restrict access if needed
+
+2. **Investigation**:
+   - Review server logs
+   - Check Retell dashboard for unusual usage
+   - Verify SSL certificate validity
+
+3. **Recovery**:
+   - Update security configurations
+   - Apply patches/updates
+   - Monitor for continued issues
 
 ## 🚨 Troubleshooting
 
