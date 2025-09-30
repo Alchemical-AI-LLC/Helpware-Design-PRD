@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Call Back Request</title>
+    <style>
+        /* Basic CSS Reset & Font */
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #ffffff;
+            color: #111827;
+        }
+
+        /* Main container for centering content */
+        .container {
+            padding: 24px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        /* Form styling */
+        #callback-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        h2 {
+            font-size: 20px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        input[type="text"], input[type="tel"] {
+            font-size: 16px;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input[type="text"]:focus, input[type="tel"]:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+        }
+
+        /* Submit Button Styling */
+        button {
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            background-color: #2563eb;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #1d4ed8;
+        }
+
+        /* Success Message Styling */
+        #success-message {
+            display: none; /* Hidden by default */
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        #success-message h3 {
+            font-size: 22px;
+            color: #16a34a;
+            margin-bottom: 8px;
+        }
+
+        #success-message p {
+            font-size: 16px;
+            color: #4b5563;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- The Form -->
+        <form id="callback-form">
+            <h2>Request a Call Back</h2>
+            <div class="form-group">
+                <label for="first-name">First Name</label>
+                <input type="text" id="first-name" name="firstname" required>
+            </div>
+            <div class="form-group">
+                <label for="last-name">Last Name</label>
+                <input type="text" id="last-name" name="lastname" required>
+            </div>
+            <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <input type="tel" id="phone" name="phone" required>
+            </div>
+            <button type="submit">Submit Request</button>
+        </form>
+
+        <!-- The Success Message (hidden initially) -->
+        <div id="success-message">
+            <h3>Thank You!</h3>
+            <p>Your request has been received. We will call you back shortly.</p>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('callback-form');
+        const successMessage = document.getElementById('success-message');
+
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            // 1. Get form data
+            const formData = new FormData(form);
+            const contactData = Object.fromEntries(formData.entries());
+
+            // 2. Structure the data for the HubSpot API
+            const hubspotPayload = {
+                properties: {
+                    firstname: contactData.firstname,
+                    lastname: contactData.lastname,
+                    phone: contactData.phone
+                }
+            };
+            
+            // 3. Define API endpoint and headers
+            const endpointURL = 'https://api.hubapi.com/crm/v3/objects/contacts';
+            const apiHeaders = {
+                'Authorization': '<REDACTED>',
+                'Content-Type': 'application/json'
+            };
+
+            // 4. Send the data to HubSpot
+            fetch(endpointURL, {
+                method: 'POST',
+                headers: apiHeaders,
+                body: JSON.stringify(hubspotPayload),
+            })
+            .then(response => {
+                // HubSpot returns 201 Created for a successful submission
+                if (response.status === 201) {
+                    return response.json();
+                } else {
+                    // If there's an error, throw it to the catch block
+                    return response.json().then(err => { throw new Error(JSON.stringify(err)); });
+                }
+            })
+            .then(data => {
+                console.log('Successfully created contact in HubSpot:', data);
+                // Hide the form and show the success message
+                form.style.display = 'none';
+                successMessage.style.display = 'block';
+            })
+            .catch(error => {
+                console.error('Error submitting to HubSpot:', error);
+                // NOTE: A "CORS" error in the console means this client-side method won't work.
+                alert('An error occurred while submitting your request. Please check the console for details.');
+            });
+        });
+    </script>
+
+</body>
+</html>
