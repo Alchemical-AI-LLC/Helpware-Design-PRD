@@ -43,7 +43,7 @@ data-agent-id="YOUR_CHAT_AGENT_ID"
 ```
 
 **Optional customizations:**
-- `data-title="Helpware Welcome Agent – Alexei"` - Change the header title
+- `data-title="Helpware Welcome Agent"` - Change the header title
 - `data-logo-url="https://yourcdn.com/hw-logo.svg"` - Add your logo URL
 - `data-color="#0E121B"` - Adjust the primary color
 
