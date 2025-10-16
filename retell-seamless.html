@@ -87,8 +87,8 @@
     type="module"
     data-public-key="public_key_39a9a4cd3749cc76cbe94"
     data-agent-id="agent_36d15796190bcb840206f004e4"
-    data-title="Helpware Welcome Agent"
-    data-logo-url="https://cd5f4a984ceb.ngrok.app/assets/helpware_logo.png"
+    data-title="Helper"
+    data-logo-url="https://helpware.com/wp-content/uploads/2025/09/helper.webp"
     data-color="#0E121B"
     data-auto-open="true"
     data-show-ai-popup="false"
@@ -199,22 +199,32 @@
 
         /* Message bubbles */
         .retell-msg.agent {
-          background: #EEF2F7 !important;
-          color: #0E121B !important;
-          border-radius: 18px !important;
+          border-radius: 5px !important;
+          background: rgba(217, 217, 217, 0.20) !important;
+          color: #171717 !important;
           padding: 12px 16px !important;
           margin-bottom: 12px !important;
           max-width: 80% !important;
+          color: var(--text, #1C1C1C);
+          font-family: Inter;
+          font-size: 14px;
+          font-weight: 500;
+          line-height: 100%;
         }
         
         .retell-msg.user {
-          background: #D5E2FF !important;
-          color: #0E121B !important;
-          border-radius: 18px !important;
+          border-radius: 5px !important;
+          background: #fff !important;
+          color: #171717 !important;
           padding: 12px 16px !important;
           margin-bottom: 12px !important;
           max-width: 80% !important;
           margin-left: auto !important;
+          color: var(--text, #1C1C1C);
+          font-family: Inter;
+          font-size: 14px;
+          font-weight: 500;
+          line-height: 100%;
         }
 
         /* Footer */
@@ -234,13 +244,21 @@
         }
 
         /* Input styling */
+        
+        .retell-input-row {
+          padding: 0 16px 0 0;
+          align-items: stretch;
+
+        }
         .retell-input {
           background: #F9FAFB !important;
-          border: 1px solid #E6EAF3 !important;
-          border-radius: 12px !important;
-          padding: 10px 14px !important;
+          border: none !important;
+          padding: 10px 20px !important;
           font-size: 14px !important;
-          color: #0E121B !important;
+          color: #1C1C1C !important;
+          font-family: Inter;
+          font-weight: 400;
+          line-height: 140%;
         }
 
         .retell-input:focus {
@@ -249,16 +267,20 @@
           background: #fff !important;
         }
 
-        .retell-send-button {
-          background: #0E121B !important;
-          border-radius: 8px !important;
-          padding: 8px 16px !important;
-          color: #fff !important;
+        .retell-send-btn {
+          background: linear-gradient(103deg, rgba(11, 194, 154, 0.10) -132.36%, rgba(19, 237, 168, 0.10) -77.51%, rgba(42, 217, 226, 0.10) 23.69%, rgba(83, 175, 255, 0.10) 61.66%, rgba(174, 163, 246, 0.10) 96.2%);
+          border-radius: 100% !important;
+          padding: 14px 16px !important;
+          color: #2ADAE2 !important;
+          transform: rotate(-45deg);
           font-weight: 500 !important;
           border: none !important;
           cursor: pointer !important;
           transition: opacity 0.2s ease !important;
         }
+
+        border-radius: 17px;
+background: linear-gradient(103deg, rgba(11, 194, 154, 0.10) -132.36%, rgba(19, 237, 168, 0.10) -77.51%, rgba(42, 217, 226, 0.10) 23.69%, rgba(83, 175, 255, 0.10) 61.66%, rgba(174, 163, 246, 0.10) 96.2%);
 
         .retell-send-button:hover {
           opacity: 0.9 !important;
